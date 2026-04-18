@@ -1,0 +1,9 @@
+{
+  "build_type": "dockerfile",
+  "ports": [
+    {
+      "port": 8317,
+      "type": "http"
+    }
+  ]
+}

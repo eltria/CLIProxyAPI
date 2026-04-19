@@ -297,7 +297,10 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 
 	// Register management routes when configuration or environment secrets are available,
 	// or when a local management password is provided (e.g. TUI mode).
-	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
+	// remote-management.disable is a hot-reloadable kill switch that forces the API off
+	// even when a secret / env / localPassword is present.
+	hasManagementSecret := !cfg.RemoteManagement.Disable &&
+		(cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != "")
 	s.managementRoutesEnabled.Store(hasManagementSecret)
 	if hasManagementSecret {
 		s.registerManagementRoutes()
@@ -919,7 +922,13 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
 	}
 	newSecretEmpty := cfg.RemoteManagement.SecretKey == ""
-	if s.envManagementSecret {
+	if cfg.RemoteManagement.Disable {
+		if s.managementRoutesEnabled.CompareAndSwap(true, false) {
+			log.Info("management routes disabled via remote-management.disable=true")
+		} else {
+			s.managementRoutesEnabled.Store(false)
+		}
+	} else if s.envManagementSecret {
 		s.registerManagementRoutes()
 		if s.managementRoutesEnabled.CompareAndSwap(false, true) {
 			log.Info("management routes enabled via MANAGEMENT_PASSWORD")

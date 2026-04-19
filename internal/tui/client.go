@@ -125,18 +125,18 @@ func (c *Client) GetConfig() (map[string]any, error) {
 	return c.getJSON("/v0/management/config")
 }
 
-// GetConfigYAML fetches the raw config.yaml content.
+// GetConfigYAML fetches the raw config.toml content.
 func (c *Client) GetConfigYAML() (string, error) {
-	data, err := c.get("/v0/management/config.yaml")
+	data, err := c.get("/v0/management/config.toml")
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
 }
 
-// PutConfigYAML uploads new config.yaml content.
+// PutConfigYAML uploads new config.toml content.
 func (c *Client) PutConfigYAML(yamlContent string) error {
-	_, err := c.put("/v0/management/config.yaml", strings.NewReader(yamlContent))
+	_, err := c.put("/v0/management/config.toml", strings.NewReader(yamlContent))
 	return err
 }
 

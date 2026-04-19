@@ -253,7 +253,7 @@ func main() {
 			log.Errorf("failed to initialize postgres token store: %v", err)
 			return
 		}
-		examplePath := filepath.Join(wd, "config.example.yaml")
+		examplePath := filepath.Join(wd, "config.example.toml")
 		ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)
 		if errBootstrap := pgStoreInst.Bootstrap(ctx, examplePath); errBootstrap != nil {
 			cancel()
@@ -317,7 +317,7 @@ func main() {
 			log.Errorf("failed to initialize object token store: %v", err)
 			return
 		}
-		examplePath := filepath.Join(wd, "config.example.yaml")
+		examplePath := filepath.Join(wd, "config.example.toml")
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		if errBootstrap := objectStoreInst.Bootstrap(ctx, examplePath); errBootstrap != nil {
 			cancel()
@@ -352,10 +352,10 @@ func main() {
 		}
 		configFilePath = gitStoreInst.ConfigPath()
 		if configFilePath == "" {
-			configFilePath = filepath.Join(gitStoreRoot, "config", "config.yaml")
+			configFilePath = filepath.Join(gitStoreRoot, "config", "config.toml")
 		}
 		if _, statErr := os.Stat(configFilePath); errors.Is(statErr, fs.ErrNotExist) {
-			examplePath := filepath.Join(wd, "config.example.yaml")
+			examplePath := filepath.Join(wd, "config.example.toml")
 			if _, errExample := os.Stat(examplePath); errExample != nil {
 				log.Errorf("failed to find template config file: %v", errExample)
 				return
@@ -387,7 +387,7 @@ func main() {
 			log.Errorf("failed to get working directory: %v", err)
 			return
 		}
-		configFilePath = filepath.Join(wd, "config.yaml")
+		configFilePath = filepath.Join(wd, "config.toml")
 		cfg, err = config.LoadConfigOptional(configFilePath, isCloudDeploy)
 	}
 	if err != nil {

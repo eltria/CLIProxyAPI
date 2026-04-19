@@ -11,32 +11,32 @@ import "strings"
 type VertexCompatKey struct {
 	// APIKey is the authentication key for accessing the Vertex-compatible API.
 	// Maps to the x-goog-api-key header.
-	APIKey string `yaml:"api-key" json:"api-key"`
+	APIKey string `toml:"api-key" json:"api-key"`
 
 	// Priority controls selection preference when multiple credentials match.
 	// Higher values are preferred; defaults to 0.
-	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
+	Priority int `toml:"priority,omitempty" json:"priority,omitempty"`
 
 	// Prefix optionally namespaces model aliases for this credential (e.g., "teamA/vertex-pro").
-	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
+	Prefix string `toml:"prefix,omitempty" json:"prefix,omitempty"`
 
 	// BaseURL optionally overrides the Vertex-compatible API endpoint.
 	// The executor will append "/v1/publishers/google/models/{model}:action" to this.
 	// When empty, requests fall back to the default Vertex API base URL.
-	BaseURL string `yaml:"base-url,omitempty" json:"base-url,omitempty"`
+	BaseURL string `toml:"base-url,omitempty" json:"base-url,omitempty"`
 
 	// ProxyURL optionally overrides the global proxy for this API key.
-	ProxyURL string `yaml:"proxy-url,omitempty" json:"proxy-url,omitempty"`
+	ProxyURL string `toml:"proxy-url,omitempty" json:"proxy-url,omitempty"`
 
 	// Headers optionally adds extra HTTP headers for requests sent with this key.
 	// Commonly used for cookies, user-agent, and other authentication headers.
-	Headers map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+	Headers map[string]string `toml:"headers,omitempty" json:"headers,omitempty"`
 
 	// Models defines the model configurations including aliases for routing.
-	Models []VertexCompatModel `yaml:"models,omitempty" json:"models,omitempty"`
+	Models []VertexCompatModel `toml:"models,omitempty" json:"models,omitempty"`
 
 	// ExcludedModels lists model IDs that should be excluded for this provider.
-	ExcludedModels []string `yaml:"excluded-models,omitempty" json:"excluded-models,omitempty"`
+	ExcludedModels []string `toml:"excluded-models,omitempty" json:"excluded-models,omitempty"`
 }
 
 func (k VertexCompatKey) GetAPIKey() string  { return k.APIKey }
@@ -46,10 +46,10 @@ func (k VertexCompatKey) GetBaseURL() string { return k.BaseURL }
 // including the actual model name and its alias for API routing.
 type VertexCompatModel struct {
 	// Name is the actual model name used by the external provider.
-	Name string `yaml:"name" json:"name"`
+	Name string `toml:"name" json:"name"`
 
 	// Alias is the model name alias that clients will use to reference this model.
-	Alias string `yaml:"alias" json:"alias"`
+	Alias string `toml:"alias" json:"alias"`
 }
 
 func (m VertexCompatModel) GetName() string  { return m.Name }

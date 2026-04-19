@@ -28,7 +28,7 @@ What LLM Client are you using? (example: roo-code, cline, claude code, etc.)
 
 **Request Information**
 The best way is to paste the cURL command of the HTTP request here.
-Alternatively, you can set `request-log: true` in the `config.yaml` file and then upload the detailed log file.
+Alternatively, you can set `request-log: true` in the `config.toml` file and then upload the detailed log file.
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.

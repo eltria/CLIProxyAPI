@@ -41,14 +41,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	return internalconfig.LoadConfigOptional(configFile, optional)
 }
 
-func SaveConfigPreserveComments(configFile string, cfg *Config) error {
-	return internalconfig.SaveConfigPreserveComments(configFile, cfg)
-}
-
-func SaveConfigPreserveCommentsUpdateNestedScalar(configFile string, path []string, value string) error {
-	return internalconfig.SaveConfigPreserveCommentsUpdateNestedScalar(configFile, path, value)
-}
-
-func NormalizeCommentIndentation(data []byte) []byte {
-	return internalconfig.NormalizeCommentIndentation(data)
+func SaveConfig(configFile string, cfg *Config) error {
+	return internalconfig.SaveConfig(configFile, cfg)
 }

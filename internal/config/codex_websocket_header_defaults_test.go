@@ -8,13 +8,13 @@ import (
 
 func TestLoadConfigOptional_CodexHeaderDefaults(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.yaml")
-	configYAML := []byte(`
-codex-header-defaults:
-  user-agent: "  my-codex-client/1.0  "
-  beta-features: "  feature-a,feature-b  "
+	configPath := filepath.Join(dir, "config.toml")
+	configTOML := []byte(`
+[codex-header-defaults]
+user-agent = "  my-codex-client/1.0  "
+beta-features = "  feature-a,feature-b  "
 `)
-	if err := os.WriteFile(configPath, configYAML, 0o600); err != nil {
+	if err := os.WriteFile(configPath, configTOML, 0o600); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 

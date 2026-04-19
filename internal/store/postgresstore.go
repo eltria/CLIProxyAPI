@@ -93,7 +93,7 @@ func NewPostgresStore(ctx context.Context, cfg PostgresStoreConfig) (*PostgresSt
 		db:         db,
 		cfg:        cfg,
 		spoolRoot:  absSpool,
-		configPath: filepath.Join(configDir, "config.yaml"),
+		configPath: filepath.Join(configDir, "config.toml"),
 		authDir:    authDir,
 	}
 	return store, nil

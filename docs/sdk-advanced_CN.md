@@ -127,5 +127,5 @@ cliproxy.GlobalModelRegistry().RegisterClient(authID, "myprov", models)
 
 - 启用请求日志：管理 API GET/PUT `/v0/management/request-log`
 - 切换调试日志：管理 API GET/PUT `/v0/management/debug`
-- 热更新：`config.yaml` 与 `auths/` 变化会自动被侦测并应用
+- 热更新：`config.toml` 与 `auths/` 变化会自动被侦测并应用
 

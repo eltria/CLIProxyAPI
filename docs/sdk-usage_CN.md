@@ -24,12 +24,12 @@ import (
 ## 最小可用示例
 
 ```go
-cfg, err := config.LoadConfig("config.yaml")
+cfg, err := config.LoadConfig("config.toml")
 if err != nil { panic(err) }
 
 svc, err := cliproxy.NewBuilder().
     WithConfig(cfg).
-    WithConfigPath("config.yaml"). // 绝对路径或工作目录相对路径
+    WithConfigPath("config.toml"). // 绝对路径或工作目录相对路径
     Build()
 if err != nil { panic(err) }
 
@@ -50,7 +50,7 @@ if err := svc.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 ```go
 svc, _ := cliproxy.NewBuilder().
   WithConfig(cfg).
-  WithConfigPath("config.yaml").
+  WithConfigPath("config.toml").
   WithServerOptions(
     // 追加全局中间件
     cliproxy.WithMiddleware(func(c *gin.Context) { c.Header("X-Embed", "1"); c.Next() }),
@@ -72,7 +72,7 @@ svc, _ := cliproxy.NewBuilder().
 
 ## 管理 API（内嵌时）
 
-- 仅当 `config.yaml` 中设置了 `remote-management.secret-key` 时才会挂载管理端点。
+- 仅当 `config.toml` 中设置了 `remote-management.secret-key` 时才会挂载管理端点。
 - 远程访问还需要 `remote-management.allow-remote: true`。
 - 具体端点见 MANAGEMENT_API_CN.md。内嵌服务器会在配置端口下暴露 `/v0/management`。
 
@@ -86,7 +86,7 @@ core.SetRoundTripperProvider(myRTProvider) // 按账户返回 *http.Transport
 
 svc, _ := cliproxy.NewBuilder().
     WithConfig(cfg).
-    WithConfigPath("config.yaml").
+    WithConfigPath("config.toml").
     WithCoreAuthManager(core).
     Build()
 ```
@@ -128,7 +128,7 @@ func (p *memoryTokenProvider) Load(ctx context.Context, cfg *config.Config) (*cl
 
 svc, _ := cliproxy.NewBuilder().
   WithConfig(cfg).
-  WithConfigPath("config.yaml").
+  WithConfigPath("config.toml").
   WithTokenClientProvider(&memoryTokenProvider{}).
   WithAPIKeyClientProvider(cliproxy.NewAPIKeyClientProvider()).
   Build()
@@ -143,7 +143,7 @@ hooks := cliproxy.Hooks{
   OnBeforeStart: func(cfg *config.Config) { log.Infof("starting on :%d", cfg.Port) },
   OnAfterStart:  func(s *cliproxy.Service) { log.Info("ready") },
 }
-svc, _ := cliproxy.NewBuilder().WithConfig(cfg).WithConfigPath("config.yaml").WithHooks(hooks).Build()
+svc, _ := cliproxy.NewBuilder().WithConfig(cfg).WithConfigPath("config.toml").WithHooks(hooks).Build()
 ```
 
 ## 关闭
@@ -158,7 +158,7 @@ _ = svc.Shutdown(ctx)
 
 ## 说明
 
-- 热更新：`config.yaml` 与 `auths/` 变化会被自动侦测并应用。
+- 热更新：`config.toml` 与 `auths/` 变化会被自动侦测并应用。
 - 请求日志可通过管理 API 在运行时开关。
 - `gemini-web.*` 相关配置在内嵌服务器中会被遵循。
 

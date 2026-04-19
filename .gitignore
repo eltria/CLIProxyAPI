@@ -3,7 +3,7 @@ cli-proxy-api
 *.exe
 
 # Configuration
-config.yaml
+config.toml
 .env
 
 # Generated content

@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v6/sdk/config"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -92,7 +92,6 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
 }
 
 func WriteConfig(path string, data []byte) error {
-	data = config.NormalizeCommentIndentation(data)
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -108,20 +107,20 @@ func WriteConfig(path string, data []byte) error {
 	return f.Close()
 }
 
-func (h *Handler) PutConfigYAML(c *gin.Context) {
+func (h *Handler) PutConfigTOML(c *gin.Context) {
 	body, err := io.ReadAll(c.Request.Body)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_yaml", "message": "cannot read request body"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_toml", "message": "cannot read request body"})
 		return
 	}
 	var cfg config.Config
-	if err = yaml.Unmarshal(body, &cfg); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_yaml", "message": err.Error()})
+	if err = toml.Unmarshal(body, &cfg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_toml", "message": err.Error()})
 		return
 	}
 	// Validate config using LoadConfigOptional with optional=false to enforce parsing
 	tmpDir := filepath.Dir(h.configFilePath)
-	tmpFile, err := os.CreateTemp(tmpDir, "config-validate-*.yaml")
+	tmpFile, err := os.CreateTemp(tmpDir, "config-validate-*.toml")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "write_failed", "message": err.Error()})
 		return
@@ -162,9 +161,9 @@ func (h *Handler) PutConfigYAML(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "changed": []string{"config"}})
 }
 
-// GetConfigYAML returns the raw config.yaml file bytes without re-encoding.
-// It preserves comments and original formatting/styles.
-func (h *Handler) GetConfigYAML(c *gin.Context) {
+// GetConfigTOML returns the raw config.toml file bytes without re-encoding.
+// It preserves comments and original formatting.
+func (h *Handler) GetConfigTOML(c *gin.Context) {
 	data, err := os.ReadFile(h.configFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -174,7 +173,7 @@ func (h *Handler) GetConfigYAML(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "read_failed", "message": err.Error()})
 		return
 	}
-	c.Header("Content-Type", "application/yaml; charset=utf-8")
+	c.Header("Content-Type", "application/toml; charset=utf-8")
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	// Write raw bytes as-is

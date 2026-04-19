@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	objectStoreConfigKey  = "config/config.yaml"
+	objectStoreConfigKey  = "config/config.toml"
 	objectStoreAuthPrefix = "auths"
 )
 
@@ -113,7 +113,7 @@ func NewObjectTokenStore(cfg ObjectStoreConfig) (*ObjectTokenStore, error) {
 		client:     client,
 		cfg:        cfg,
 		spoolRoot:  absRoot,
-		configPath: filepath.Join(configDir, "config.yaml"),
+		configPath: filepath.Join(configDir, "config.toml"),
 		authDir:    authDir,
 	}, nil
 }

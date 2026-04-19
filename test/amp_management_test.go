@@ -22,7 +22,7 @@ func init() {
 func newAmpTestHandler(t *testing.T) (*management.Handler, string) {
 	t.Helper()
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	configPath := filepath.Join(tmpDir, "config.toml")
 
 	cfg := &config.Config{
 		AmpCode: config.AmpCode{
@@ -888,7 +888,7 @@ func TestNilHandlerGetAmpCode(t *testing.T) {
 func TestEmptyConfigGetAmpModelMappings(t *testing.T) {
 	cfg := &config.Config{}
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	configPath := filepath.Join(tmpDir, "config.toml")
 	if err := os.WriteFile(configPath, []byte("port: 8080\n"), 0644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}

@@ -93,7 +93,7 @@ func (s *GitTokenStore) ConfigPath() string {
 	if s.configDir == "" {
 		return ""
 	}
-	return filepath.Join(s.configDir, "config.yaml")
+	return filepath.Join(s.configDir, "config.toml")
 }
 
 // EnsureRepository prepares the local git working tree by cloning or opening the repository.

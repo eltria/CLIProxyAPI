@@ -57,16 +57,17 @@ default:
 
 代理内置一个访问提供者：
 
-- `config-api-key`：校验 `config.yaml` 顶层的 `api-keys`。
+- `config-api-key`：校验 `config.toml` 顶层的 `api-keys`。
   - 凭证来源：`Authorization: Bearer`、`X-Goog-Api-Key`、`X-Api-Key`、`?key=`、`?auth_token=`
   - 元数据：`Result.Metadata["source"]` 会写入匹配到的来源标识
 
 在 CLI 服务端与 `sdk/cliproxy` 中，该 provider 会根据加载到的配置自动注册。
 
-```yaml
-api-keys:
-  - sk-test-123
-  - sk-prod-456
+```toml
+api-keys = [
+  "sk-test-123",
+  "sk-prod-456",
+]
 ```
 
 ## 引入外部 Go 模块提供者
@@ -129,12 +130,12 @@ func init() {
 使用 `sdk/cliproxy` 构建服务时会自动接入 `@sdk/access`。如果希望在宿主进程里复用同一个 `Manager` 实例，可传入自定义管理器：
 
 ```go
-coreCfg, _ := config.LoadConfig("config.yaml")
+coreCfg, _ := config.LoadConfig("config.toml")
 accessManager := sdkaccess.NewManager()
 
 svc, _ := cliproxy.NewBuilder().
   WithConfig(coreCfg).
-  WithConfigPath("config.yaml").
+  WithConfigPath("config.toml").
   WithRequestAccessManager(accessManager).
   Build()
 ```

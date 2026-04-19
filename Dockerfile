@@ -33,7 +33,7 @@ RUN set -eux; \
     ls -la /CLIProxyAPI/CLIProxyAPI; \
     test -s /CLIProxyAPI/CLIProxyAPI
 
-COPY config.example.yaml /CLIProxyAPI/config.example.yaml
+COPY config.example.toml /CLIProxyAPI/config.example.toml
 
 WORKDIR /CLIProxyAPI
 
@@ -43,4 +43,4 @@ ENV TZ=Asia/Shanghai
 
 RUN cp /usr/share/zoneinfo/${TZ} /etc/localtime && echo "${TZ}" > /etc/timezone
 
-CMD ["sh", "-c", "[ -f config.yaml ] || cp config.example.yaml config.yaml; exec ./CLIProxyAPI"]
+CMD ["sh", "-c", "[ -f config.toml ] || cp config.example.toml config.toml; exec ./CLIProxyAPI"]

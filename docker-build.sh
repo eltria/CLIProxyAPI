@@ -17,8 +17,8 @@ SECRET_FILE="${STATS_DIR}/.api_secret"
 WITH_USAGE=false
 
 get_port() {
-  if [[ -f "config.yaml" ]]; then
-    grep -E "^port:" config.yaml | sed -E 's/^port: *["'"'"']?([0-9]+)["'"'"']?.*$/\1/'
+  if [[ -f "config.toml" ]]; then
+    grep -E "^port *=" config.toml | sed -E 's/^port *= *["'"'"']?([0-9]+)["'"'"']?.*$/\1/'
   else
     echo "8317"
   fi

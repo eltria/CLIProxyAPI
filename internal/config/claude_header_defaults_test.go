@@ -8,18 +8,18 @@ import (
 
 func TestLoadConfigOptional_ClaudeHeaderDefaults(t *testing.T) {
 	dir := t.TempDir()
-	configPath := filepath.Join(dir, "config.yaml")
-	configYAML := []byte(`
-claude-header-defaults:
-  user-agent: "  claude-cli/2.1.70 (external, cli)  "
-  package-version: "  0.80.0  "
-  runtime-version: "  v24.5.0  "
-  os: "  MacOS  "
-  arch: "  arm64  "
-  timeout: "  900  "
-  stabilize-device-profile: false
+	configPath := filepath.Join(dir, "config.toml")
+	configTOML := []byte(`
+[claude-header-defaults]
+user-agent = "  claude-cli/2.1.70 (external, cli)  "
+package-version = "  0.80.0  "
+runtime-version = "  v24.5.0  "
+os = "  MacOS  "
+arch = "  arm64  "
+timeout = "  900  "
+stabilize-device-profile = false
 `)
-	if err := os.WriteFile(configPath, configYAML, 0o600); err != nil {
+	if err := os.WriteFile(configPath, configTOML, 0o600); err != nil {
 		t.Fatalf("failed to write config: %v", err)
 	}
 

@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/pelletier/go-toml/v2"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
-	"gopkg.in/yaml.v3"
 
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
@@ -135,7 +135,7 @@ func (w *Watcher) SetConfig(cfg *config.Config) {
 	w.clientsMutex.Lock()
 	defer w.clientsMutex.Unlock()
 	w.config = cfg
-	w.oldConfigYaml, _ = yaml.Marshal(cfg)
+	w.oldConfigYaml, _ = toml.Marshal(cfg)
 }
 
 // SetAuthUpdateQueue sets the queue used to emit auth updates.

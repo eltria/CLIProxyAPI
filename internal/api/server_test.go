@@ -43,7 +43,7 @@ func newTestServer(t *testing.T) *Server {
 	authManager := auth.NewManager(nil, nil, nil)
 	accessManager := sdkaccess.NewManager()
 
-	configPath := filepath.Join(tmpDir, "config.yaml")
+	configPath := filepath.Join(tmpDir, "config.toml")
 	return NewServer(cfg, authManager, accessManager, configPath)
 }
 
@@ -163,7 +163,7 @@ func TestDefaultRequestLoggerFactory_UsesResolvedLogDirectory(t *testing.T) {
 	if errMkdirConfig := os.MkdirAll(configDir, 0o755); errMkdirConfig != nil {
 		t.Fatalf("failed to create config dir: %v", errMkdirConfig)
 	}
-	configPath := filepath.Join(configDir, "config.yaml")
+	configPath := filepath.Join(configDir, "config.toml")
 
 	authDir := filepath.Join(tmpDir, "auth")
 	if errMkdirAuth := os.MkdirAll(authDir, 0o700); errMkdirAuth != nil {

@@ -63,10 +63,11 @@ The proxy includes one built-in access provider:
 
 In the CLI server and `sdk/cliproxy`, this provider is registered automatically based on the loaded configuration.
 
-```yaml
-api-keys:
-  - sk-test-123
-  - sk-prod-456
+```toml
+api-keys = [
+  "sk-test-123",
+  "sk-prod-456",
+]
 ```
 
 ## Loading Providers from External Go Modules
@@ -129,12 +130,12 @@ Errors propagate immediately to the caller unless they are classified as `not_ha
 `sdk/cliproxy` wires `@sdk/access` automatically when you build a CLI service via `cliproxy.NewBuilder`. Supplying a manager lets you reuse the same instance in your host process:
 
 ```go
-coreCfg, _ := config.LoadConfig("config.yaml")
+coreCfg, _ := config.LoadConfig("config.toml")
 accessManager := sdkaccess.NewManager()
 
 svc, _ := cliproxy.NewBuilder().
   WithConfig(coreCfg).
-  WithConfigPath("config.yaml").
+  WithConfigPath("config.toml").
   WithRequestAccessManager(accessManager).
   Build()
 ```

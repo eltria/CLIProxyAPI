@@ -38,7 +38,7 @@ import (
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	"github.com/pelletier/go-toml/v2"
 )
 
 const oauthCallbackSuccessHTML = `<html><head><meta charset="utf-8"><title>Authentication successful</title><script>setTimeout(function(){window.close();},5000);</script></head><body><h1>Authentication successful!</h1><p>You can close this window.</p><p>This window will close automatically in 5 seconds.</p></body></html>`
@@ -255,7 +255,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	// Save initial YAML snapshot
-	s.oldConfigYaml, _ = yaml.Marshal(cfg)
+	s.oldConfigYaml, _ = toml.Marshal(cfg)
 	s.applyAccessConfig(nil, cfg)
 	if authManager != nil {
 		authManager.SetRetryConfig(cfg.RequestRetry, time.Duration(cfg.MaxRetryInterval)*time.Second, cfg.MaxRetryCredentials)
@@ -485,8 +485,8 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/usage/export", s.mgmt.ExportUsageStatistics)
 		mgmt.POST("/usage/import", s.mgmt.ImportUsageStatistics)
 		mgmt.GET("/config", s.mgmt.GetConfig)
-		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
-		mgmt.PUT("/config.yaml", s.mgmt.PutConfigYAML)
+		mgmt.GET("/config.toml", s.mgmt.GetConfigTOML)
+		mgmt.PUT("/config.toml", s.mgmt.PutConfigTOML)
 		mgmt.GET("/latest-version", s.mgmt.GetLatestVersion)
 
 		mgmt.GET("/debug", s.mgmt.GetDebug)
@@ -870,7 +870,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	// Reconstruct old config from YAML snapshot to avoid reference sharing issues
 	var oldCfg *config.Config
 	if len(s.oldConfigYaml) > 0 {
-		_ = yaml.Unmarshal(s.oldConfigYaml, &oldCfg)
+		_ = toml.Unmarshal(s.oldConfigYaml, &oldCfg)
 	}
 
 	// Update request logger enabled state if it has changed
@@ -963,7 +963,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	}
 	managementasset.SetCurrentConfig(cfg)
 	// Save YAML snapshot for next comparison
-	s.oldConfigYaml, _ = yaml.Marshal(cfg)
+	s.oldConfigYaml, _ = toml.Marshal(cfg)
 
 	s.handlers.UpdateClients(&cfg.SDKConfig)
 

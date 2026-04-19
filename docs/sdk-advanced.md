@@ -134,5 +134,5 @@ The embedded server calls this automatically for built‑in providers; for custo
 
 - Enable request logging: Management API GET/PUT `/v0/management/request-log`
 - Toggle debug logs: Management API GET/PUT `/v0/management/debug`
-- Hot reload changes in `config.yaml` and `auths/` are picked up automatically by the watcher
+- Hot reload changes in `config.toml` and `auths/` are picked up automatically by the watcher
 

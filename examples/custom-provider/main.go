@@ -173,7 +173,7 @@ func (MyExecutor) Refresh(ctx context.Context, a *coreauth.Auth) (*coreauth.Auth
 }
 
 func main() {
-	cfg, err := config.LoadConfig("config.yaml")
+	cfg, err := config.LoadConfig("config.toml")
 	if err != nil {
 		panic(err)
 	}
@@ -199,7 +199,7 @@ func main() {
 
 	svc, err := cliproxy.NewBuilder().
 		WithConfig(cfg).
-		WithConfigPath("config.yaml").
+		WithConfigPath("config.toml").
 		WithCoreAuthManager(core).
 		WithServerOptions(
 			// Optional: add a simple middleware + custom request logger

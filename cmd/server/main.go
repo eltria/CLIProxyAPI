@@ -401,6 +401,14 @@ func main() {
 	if value, ok := lookupEnv("CLI_PROXY_SECRET_KEY", "cli_proxy_secret_key"); ok {
 		cfg.RemoteManagement.SecretKey = value
 	}
+	if value, ok := lookupEnv("CLI_PROXY_ALLOW_REMOTE", "cli_proxy_allow_remote"); ok {
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "1", "true", "yes", "on":
+			cfg.RemoteManagement.AllowRemote = true
+		case "0", "false", "no", "off":
+			cfg.RemoteManagement.AllowRemote = false
+		}
+	}
 	if value, ok := lookupEnv("CLI_PROXY_API_KEYS", "cli_proxy_api_keys"); ok {
 		parts := strings.Split(value, ",")
 		keys := make([]string, 0, len(parts))

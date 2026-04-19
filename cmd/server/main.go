@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -395,6 +396,28 @@ func main() {
 	}
 	if cfg == nil {
 		cfg = &config.Config{}
+	}
+
+	if value, ok := lookupEnv("CLI_PROXY_SECRET_KEY", "cli_proxy_secret_key"); ok {
+		cfg.RemoteManagement.SecretKey = value
+	}
+	if value, ok := lookupEnv("CLI_PROXY_API_KEYS", "cli_proxy_api_keys"); ok {
+		parts := strings.Split(value, ",")
+		keys := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				keys = append(keys, trimmed)
+			}
+		}
+		cfg.APIKeys = keys
+	}
+	if value, ok := lookupEnv("CLI_PROXY_PORT", "cli_proxy_port", "PORT"); ok {
+		if parsed, errParse := strconv.Atoi(value); errParse == nil && parsed > 0 {
+			cfg.Port = parsed
+		}
+	}
+	if isCloudDeploy && cfg.Port == 0 {
+		cfg.Port = 8317
 	}
 
 	// In cloud deploy mode, check if we have a valid configuration

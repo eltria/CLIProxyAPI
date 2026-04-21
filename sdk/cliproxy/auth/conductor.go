@@ -66,7 +66,25 @@ const (
 	refreshFailureBackoff = 5 * time.Minute
 	quotaBackoffBase      = time.Second
 	quotaBackoffMax       = 30 * time.Minute
+	// quotaRetryAfterCap clamps provider-supplied Retry-After / retryDelay
+	// durations so a single upstream 429 with a weekly-reset timestamp cannot
+	// knock a credential out for days. The exponential backoff branch is
+	// already bounded by quotaBackoffMax, so this cap only affects the
+	// "provider told us exactly how long" path.
+	quotaRetryAfterCap    = 2 * time.Hour
 )
+
+// capQuotaRetryAfter clamps a positive duration to quotaRetryAfterCap. Non-positive
+// values pass through unchanged.
+func capQuotaRetryAfter(d time.Duration) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	if d > quotaRetryAfterCap {
+		return quotaRetryAfterCap
+	}
+	return d
+}
 
 var quotaCooldownDisabled atomic.Bool
 
@@ -2048,7 +2066,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 							backoffLevel := state.Quota.BackoffLevel
 							if !disableCooling {
 								if result.RetryAfter != nil {
-									next = now.Add(*result.RetryAfter)
+									next = now.Add(capQuotaRetryAfter(*result.RetryAfter))
 								} else {
 									cooldown, nextLevel := nextQuotaCooldown(backoffLevel, disableCooling)
 									if cooldown > 0 {
@@ -2461,7 +2479,7 @@ func applyAuthFailureState(auth *Auth, resultErr *Error, retryAfter *time.Durati
 		var next time.Time
 		if !disableCooling {
 			if retryAfter != nil {
-				next = now.Add(*retryAfter)
+				next = now.Add(capQuotaRetryAfter(*retryAfter))
 			} else {
 				cooldown, nextLevel := nextQuotaCooldown(auth.Quota.BackoffLevel, disableCooling)
 				if cooldown > 0 {

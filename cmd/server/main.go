@@ -461,6 +461,13 @@ func main() {
 	// Set the log level based on the configuration.
 	util.SetLogLevel(cfg)
 
+	// Default auth directory when the config file omits auth-dir entirely
+	// (e.g. Zeabur bootstrap where config.toml never gets materialized because
+	// the Config Editor overlay blocks `cp config.example.toml config.toml`).
+	// Without this guard MkdirAll("") crashes the service at startup.
+	if strings.TrimSpace(cfg.AuthDir) == "" {
+		cfg.AuthDir = filepath.Join(wd, "auths")
+	}
 	if resolvedAuthDir, errResolveAuthDir := util.ResolveAuthDir(cfg.AuthDir); errResolveAuthDir != nil {
 		log.Errorf("failed to resolve auth directory: %v", errResolveAuthDir)
 		return

@@ -25,7 +25,7 @@ FROM alpine:3.22.0
 
 RUN apk add --no-cache tzdata ca-certificates
 
-RUN mkdir /CLIProxyAPI
+RUN mkdir -p /CLIProxyAPI
 
 COPY --from=builder /out/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
 RUN set -eux; \

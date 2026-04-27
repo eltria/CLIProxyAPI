@@ -2,9 +2,11 @@ package cfg
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -79,6 +81,15 @@ func Bootstrap(ctx context.Context, opt Options) {
 // writeAtomic writes b to path via tmp + rename so concurrent readers
 // (cliproxy's fsnotify-watched LoadConfigOptional path) never see a
 // half-written file. The directory is created if needed.
+//
+// When the destination is a bind-mounted single file (e.g. Zeabur
+// Config Editor overlays /CLIProxyAPI/config.toml as a read-only
+// mountpoint, but the file content itself is writable in-place), the
+// kernel returns EBUSY on rename(2) because you can't replace a
+// mountpoint inode. Fall back to a direct overwrite in that case —
+// it loses cross-syscall atomicity, but for the small TOML bodies
+// cliproxy reads it's a single write() syscall so readers either see
+// the old or new content, never a torn file.
 func writeAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
@@ -89,6 +100,13 @@ func writeAtomic(path string, b []byte) error {
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)
+		if errors.Is(err, syscall.EBUSY) {
+			// Direct overwrite when the destination is a mounted file.
+			if writeErr := os.WriteFile(path, b, 0o644); writeErr != nil {
+				return fmt.Errorf("rename hit EBUSY and direct write %s failed: %w", path, writeErr)
+			}
+			return nil
+		}
 		return fmt.Errorf("rename %s -> %s: %w", tmp, path, err)
 	}
 	return nil

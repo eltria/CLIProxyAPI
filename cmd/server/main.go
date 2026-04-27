@@ -20,6 +20,7 @@ import (
 	"github.com/joho/godotenv"
 	configaccess "github.com/router-for-me/CLIProxyAPI/v6/internal/access/config_access"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/buildinfo"
+	confighub "github.com/router-for-me/CLIProxyAPI/v6/internal/cfg"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/cmd"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
@@ -380,6 +381,7 @@ func main() {
 		}
 	} else if configPath != "" {
 		configFilePath = configPath
+		bootstrapConfigHub(context.Background(), configFilePath)
 		cfg, err = config.LoadConfigOptional(configPath, isCloudDeploy)
 	} else {
 		wd, err = os.Getwd()
@@ -388,6 +390,7 @@ func main() {
 			return
 		}
 		configFilePath = filepath.Join(wd, "config.toml")
+		bootstrapConfigHub(context.Background(), configFilePath)
 		cfg, err = config.LoadConfigOptional(configFilePath, isCloudDeploy)
 	}
 	if err != nil {
@@ -615,4 +618,43 @@ func main() {
 			cmd.StartService(cfg, configFilePath, password)
 		}
 	}
+}
+
+// bootstrapConfigHub wires the config_hub integration into the local file
+// path when the CONFIGHUB_* environment variables are set. It writes the
+// fetched config into spoolPath so that LoadConfigOptional and the
+// fsnotify-driven hot-reload chain treat config_hub as the source of
+// truth without any further plumbing. When env is missing or the remote
+// is unreachable, this is a no-op (cliproxy falls back to the local
+// file already at spoolPath, if any).
+func bootstrapConfigHub(ctx context.Context, spoolPath string) {
+	get := func(keys ...string) string {
+		for _, k := range keys {
+			if v, ok := os.LookupEnv(k); ok {
+				if t := strings.TrimSpace(v); t != "" {
+					return t
+				}
+			}
+		}
+		return ""
+	}
+	baseURL := get("CONFIGHUB_URL", "confighub_url")
+	apiKey := get("CONFIGHUB_API_KEY", "confighub_api_key")
+	namespace := get("CONFIGHUB_NAMESPACE", "confighub_namespace")
+	group := get("CONFIGHUB_GROUP", "confighub_group")
+	dataID := get("CONFIGHUB_DATAID", "confighub_dataid")
+	if group == "" {
+		group = "prod"
+	}
+	if dataID == "" {
+		dataID = "app.toml"
+	}
+	confighub.Bootstrap(ctx, confighub.Options{
+		BaseURL:   baseURL,
+		APIKey:    apiKey,
+		Namespace: namespace,
+		Group:     group,
+		DataID:    dataID,
+		SpoolPath: spoolPath,
+	})
 }

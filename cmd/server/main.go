@@ -380,16 +380,20 @@ func main() {
 			log.Infof("git-backed token store enabled, repository path: %s", gitStoreRoot)
 		}
 	} else if configPath != "" {
-		configFilePath = configPath
+		original := configPath
+		configFilePath = redirectForConfigHub(original)
+		seedConfigHubSpool(configFilePath, original)
 		bootstrapConfigHub(context.Background(), configFilePath)
-		cfg, err = config.LoadConfigOptional(configPath, isCloudDeploy)
+		cfg, err = config.LoadConfigOptional(configFilePath, isCloudDeploy)
 	} else {
 		wd, err = os.Getwd()
 		if err != nil {
 			log.Errorf("failed to get working directory: %v", err)
 			return
 		}
-		configFilePath = filepath.Join(wd, "config.toml")
+		original := filepath.Join(wd, "config.toml")
+		configFilePath = redirectForConfigHub(original)
+		seedConfigHubSpool(configFilePath, original)
 		bootstrapConfigHub(context.Background(), configFilePath)
 		cfg, err = config.LoadConfigOptional(configFilePath, isCloudDeploy)
 	}
@@ -618,6 +622,66 @@ func main() {
 			cmd.StartService(cfg, configFilePath, password)
 		}
 	}
+}
+
+// redirectForConfigHub diverts the local spool path away from the user's
+// "primary" config file when CONFIGHUB_URL is set. Some deployment
+// platforms (notably Zeabur Config Editor) mount /CLIProxyAPI/config.toml
+// as a read-only single-file overlay, so any attempt to rewrite that
+// path fails with EBUSY (rename) or "read-only file system" (open).
+//
+// Pointing cliproxy at a sibling file (e.g. config.confighub.toml) when
+// config_hub is the source of truth bypasses the conflict entirely:
+// LoadConfigOptional, the fsnotify watcher, and the management API
+// PUT/GET endpoints all follow this path. CONFIGHUB_SPOOL_PATH lets
+// operators override the location explicitly if the default still
+// collides with their platform.
+func redirectForConfigHub(defaultPath string) string {
+	if strings.TrimSpace(os.Getenv("CONFIGHUB_URL")) == "" {
+		return defaultPath
+	}
+	if override := strings.TrimSpace(os.Getenv("CONFIGHUB_SPOOL_PATH")); override != "" {
+		return override
+	}
+	dir := filepath.Dir(defaultPath)
+	base := filepath.Base(defaultPath)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+	return filepath.Join(dir, name+".confighub"+ext)
+}
+
+// seedConfigHubSpool guarantees the redirected spool file exists before
+// LoadConfigOptional reads it, in case config_hub is unreachable on the
+// first boot. Tries (in order):
+//
+//  1. spool already exists — no-op
+//  2. copy from `original` (the un-redirected path; may be a read-only
+//     Config Editor mount that still has the operator's prod content)
+//  3. copy from <wd>/config.example.toml (image-bundled template)
+//
+// If all three fail we leave LoadConfigOptional to handle the missing
+// file (in cloud-deploy mode it tolerates missing/empty config).
+func seedConfigHubSpool(spool, original string) {
+	if spool == original {
+		return
+	}
+	if _, err := os.Stat(spool); err == nil {
+		return
+	}
+	candidates := []string{original, filepath.Join(filepath.Dir(spool), "config.example.toml")}
+	for _, src := range candidates {
+		data, err := os.ReadFile(src)
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(spool, data, 0o644); err != nil {
+			log.WithError(err).Warnf("config_hub: failed to seed spool %s from %s", spool, src)
+			continue
+		}
+		log.Infof("config_hub: seeded spool %s from %s (config_hub will overwrite if reachable)", spool, src)
+		return
+	}
+	log.Warnf("config_hub: no seed source available for spool %s; relying on config_hub Bootstrap", spool)
 }
 
 // bootstrapConfigHub wires the config_hub integration into the local file

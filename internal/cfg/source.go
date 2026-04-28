@@ -203,17 +203,32 @@ func (s *Source) watchOnce(ctx context.Context, dataIDs []string) error {
 		}
 	}
 
-	// 心跳 goroutine（每 25s 发 ping）
+	// 心跳 goroutine：双层保险。
+	//   - WS protocol-level PingMessage 每 20s 发一次：让中间反向代理识别为
+	//     TCP 活动，避免 30s idle timeout 切线（实测有这个问题）。
+	//     gorilla/websocket 的 WriteControl 与 Read/Write 并发安全。
+	//   - app-level {"op":"ping"} 每 25s 发一次：跟 config_hub 服务器
+	//     约定的应用层心跳，按 integration.md §4 协议走。
 	pingCtx, pingCancel := context.WithCancel(ctx)
 	defer pingCancel()
 	go func() {
-		t := time.NewTicker(25 * time.Second)
-		defer t.Stop()
+		wsTick := time.NewTicker(20 * time.Second)
+		appTick := time.NewTicker(25 * time.Second)
+		defer wsTick.Stop()
+		defer appTick.Stop()
 		for {
 			select {
 			case <-pingCtx.Done():
 				return
-			case <-t.C:
+			case <-wsTick.C:
+				if err := conn.WriteControl(
+					websocket.PingMessage,
+					nil,
+					time.Now().Add(5*time.Second),
+				); err != nil {
+					return
+				}
+			case <-appTick.C:
 				if err := conn.WriteJSON(map[string]string{"op": "ping"}); err != nil {
 					return
 				}

@@ -637,6 +637,12 @@ func (s *Server) registerManagementRoutes() {
 
 func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Disable kill switch is read directly from the latest cfg so the
+		// middleware doesn't depend on the watcher diff catching this field.
+		if cfg := s.cfg; cfg != nil && cfg.RemoteManagement.Disable {
+			c.AbortWithStatus(http.StatusNotFound)
+			return
+		}
 		if !s.managementRoutesEnabled.Load() {
 			c.AbortWithStatus(http.StatusNotFound)
 			return

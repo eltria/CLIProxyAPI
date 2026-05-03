@@ -600,9 +600,38 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		return &Config{}, nil
 	}
 
-	// Unmarshal the YAML data into the Config struct.
-	var cfg Config
+	cfg, err := parseConfigData(data, configFile)
+	if err != nil {
+		if optional {
+			// In cloud deploy mode, if parse fails, return empty config instead of error.
+			return &Config{}, nil
+		}
+		return nil, err
+	}
+	return cfg, nil
+}
+
+// LoadConfigBytes parses raw TOML config bytes without touching the
+// filesystem. Used by in-memory hot-reload pipelines (config_hub push)
+// where the spool file may be a best-effort cache rather than the
+// authoritative source. Behaves identically to LoadConfigOptional for
+// the parse / sanitize / hash steps; the only side effect omitted is
+// the bcrypt write-back, which has no target file in this mode.
+func LoadConfigBytes(data []byte) (*Config, error) {
+	if len(data) == 0 {
+		return &Config{}, nil
+	}
+	return parseConfigData(data, "")
+}
+
+// parseConfigData unmarshals TOML data into a *Config and applies the
+// same defaults / sanitizers as LoadConfigOptional. configFile may be
+// empty; when present and the secret-key was hashed in-place, the hash
+// is persisted back to that file so subsequent reads see the canonical
+// form.
+func parseConfigData(data []byte, configFile string) (*Config, error) {
 	// Set defaults before unmarshal so that absent keys keep defaults.
+	var cfg Config
 	cfg.Host = "" // Default empty: binds to all interfaces (IPv4 + IPv6)
 	cfg.LoggingToFile = false
 	cfg.LogsMaxTotalSizeMB = 0
@@ -613,11 +642,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.Pprof.Addr = DefaultPprofAddr
 	cfg.AmpCode.RestrictManagementToLocalhost = false // Default to false: API key auth is sufficient
 	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
-	if err = toml.Unmarshal(data, &cfg); err != nil {
-		if optional {
-			// In cloud deploy mode, if TOML parsing fails, return empty config instead of error.
-			return &Config{}, nil
-		}
+	if err := toml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
@@ -630,9 +655,12 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		}
 		cfg.RemoteManagement.SecretKey = hashed
 
-		// Persist the hashed value back to config.toml via a targeted line edit so
-		// comments and field ordering are preserved.
-		_ = updateTOMLScalarInPlace(configFile, "secret-key", hashed)
+		// Persist the hashed value back to the source file via a targeted
+		// line edit so comments and field ordering are preserved. Skipped
+		// when configFile is empty (in-memory parse, no source file).
+		if configFile != "" {
+			_ = updateTOMLScalarInPlace(configFile, "secret-key", hashed)
+		}
 	}
 
 	cfg.RemoteManagement.PanelGitHubRepository = strings.TrimSpace(cfg.RemoteManagement.PanelGitHubRepository)
@@ -687,22 +715,6 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Validate raw payload rules and drop invalid entries.
 	cfg.SanitizePayloadRules()
 
-	// NOTE: Legacy migration persistence is intentionally disabled together with
-	// startup legacy migration to keep startup read-only for config.toml.
-	// Re-enable the block below if automatic startup migration is needed again.
-	// if cfg.legacyMigrationPending {
-	// 	fmt.Println("Detected legacy configuration keys, attempting to persist the normalized config...")
-	// 	if !optional && configFile != "" {
-	// 		if err := SaveConfigPreserveComments(configFile, &cfg); err != nil {
-	// 			return nil, fmt.Errorf("failed to persist migrated legacy config: %w", err)
-	// 		}
-	// 		fmt.Println("Legacy configuration normalized and persisted.")
-	// 	} else {
-	// 		fmt.Println("Legacy configuration normalized in memory; persistence skipped.")
-	// 	}
-	// }
-
-	// Return the populated configuration struct.
 	return &cfg, nil
 }
 

@@ -5,9 +5,42 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
+
+// ApplyFunc applies a fresh TOML payload from config_hub directly to
+// the running service, bypassing the spool-file → fsnotify → watcher
+// reload chain. Returning an error logs the failure but does not stop
+// subsequent invocations.
+type ApplyFunc func(content []byte) error
+
+var registeredApply atomic.Pointer[ApplyFunc]
+
+// SetApply installs (or, with nil, clears) the in-memory apply
+// callback. Bootstrap's OnChange invokes it after the spool write so a
+// failed or missing spool never suppresses the in-memory reload, and a
+// successful in-memory reload makes the watcher's debounced fsnotify
+// path redundant rather than the only path that can land changes.
+//
+// Safe to call from any goroutine. Idempotent: the most recent
+// registration wins.
+func SetApply(fn ApplyFunc) {
+	if fn == nil {
+		registeredApply.Store(nil)
+		return
+	}
+	registeredApply.Store(&fn)
+}
+
+// loadApply returns the currently registered apply callback or nil.
+func loadApply() ApplyFunc {
+	if p := registeredApply.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
 
 // Options bundles env-derived settings + the spool path that cliproxy's
 // existing LoadConfigOptional + fsnotify chain will consume.
@@ -65,13 +98,27 @@ func Bootstrap(ctx context.Context, opt Options) {
 
 	// install change handler + start watch
 	src.OnChange(func(s *Snapshot) {
+		spoolWritten := true
 		if err := writeAtomic(opt.SpoolPath, s.Content); err != nil {
 			log.WithError(err).Errorf("config_hub: write spool %s on change failed", opt.SpoolPath)
-			return
+			spoolWritten = false
+			// fall through: spool failure must not suppress the in-memory
+			// apply path — that's the entire point of the in-memory branch
 		}
 		log.Infof("config changed: dataId=%s version=%d md5=%s", s.DataID, s.Version, s.MD5)
-		// fsnotify on opt.SpoolPath drives the rest: cliproxy's
-		// reloadConfigIfChanged debounces and applies in-memory.
+		// Primary path: in-memory apply directly into the running service
+		// when a callback has been registered. The watcher's fsnotify path
+		// is redundant when this succeeds but still serves as a backstop
+		// when no callback is registered (e.g. tests or future embedders).
+		if apply := loadApply(); apply != nil {
+			if err := apply(s.Content); err != nil {
+				log.WithError(err).Errorf("config_hub: in-memory apply failed")
+			}
+		} else if !spoolWritten {
+			// No in-memory consumer AND spool write failed → this push is
+			// effectively lost. Surface it loudly so operators notice.
+			log.Warn("config_hub: change dropped (no apply callback and spool write failed)")
+		}
 	})
 	src.Watch(ctx, opt.DataID)
 }

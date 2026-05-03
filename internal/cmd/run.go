@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
+	confighub "github.com/router-for-me/CLIProxyAPI/v6/internal/cfg"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
@@ -49,6 +50,13 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 		return
 	}
 
+	// Register the in-memory apply path so config_hub WS pushes drive
+	// the same reload state machine as the file watcher. The callback
+	// is a no-op when CONFIGHUB_URL isn't set (Bootstrap never installs
+	// an OnChange handler in that case).
+	confighub.SetApply(service.ApplyConfigBytes)
+	defer confighub.SetApply(nil)
+
 	err = service.Run(runCtx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		log.Errorf("proxy service exited with error: %v", err)
@@ -73,8 +81,13 @@ func StartServiceBackground(cfg *config.Config, configPath string, localPassword
 		return cancelFn, doneCh
 	}
 
+	// Mirror StartService: wire config_hub in-memory apply to the
+	// service. Cleared when the background goroutine exits.
+	confighub.SetApply(service.ApplyConfigBytes)
+
 	go func() {
 		defer close(doneCh)
+		defer confighub.SetApply(nil)
 		if err := service.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Errorf("proxy service exited with error: %v", err)
 		}

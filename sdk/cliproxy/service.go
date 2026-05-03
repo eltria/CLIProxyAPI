@@ -608,87 +608,7 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 
 	var watcherWrapper *WatcherWrapper
-	reloadCallback := func(newCfg *config.Config) {
-		previousStrategy := ""
-		var previousSessionAffinity bool
-		var previousSessionAffinityTTL string
-		s.cfgMu.RLock()
-		if s.cfg != nil {
-			previousStrategy = strings.ToLower(strings.TrimSpace(s.cfg.Routing.Strategy))
-			previousSessionAffinity = s.cfg.Routing.ClaudeCodeSessionAffinity || s.cfg.Routing.SessionAffinity
-			previousSessionAffinityTTL = s.cfg.Routing.SessionAffinityTTL
-		}
-		s.cfgMu.RUnlock()
-
-		if newCfg == nil {
-			s.cfgMu.RLock()
-			newCfg = s.cfg
-			s.cfgMu.RUnlock()
-		}
-		if newCfg == nil {
-			return
-		}
-
-		nextStrategy := strings.ToLower(strings.TrimSpace(newCfg.Routing.Strategy))
-		normalizeStrategy := func(strategy string) string {
-			switch strategy {
-			case "fill-first", "fillfirst", "ff":
-				return "fill-first"
-			default:
-				return "round-robin"
-			}
-		}
-		previousStrategy = normalizeStrategy(previousStrategy)
-		nextStrategy = normalizeStrategy(nextStrategy)
-
-		nextSessionAffinity := newCfg.Routing.ClaudeCodeSessionAffinity || newCfg.Routing.SessionAffinity
-		nextSessionAffinityTTL := newCfg.Routing.SessionAffinityTTL
-
-		selectorChanged := previousStrategy != nextStrategy ||
-			previousSessionAffinity != nextSessionAffinity ||
-			previousSessionAffinityTTL != nextSessionAffinityTTL
-
-		if s.coreManager != nil && selectorChanged {
-			var selector coreauth.Selector
-			switch nextStrategy {
-			case "fill-first":
-				selector = &coreauth.FillFirstSelector{}
-			default:
-				selector = &coreauth.RoundRobinSelector{}
-			}
-
-			if nextSessionAffinity {
-				ttl := time.Hour
-				if ttlStr := strings.TrimSpace(nextSessionAffinityTTL); ttlStr != "" {
-					if parsed, err := time.ParseDuration(ttlStr); err == nil && parsed > 0 {
-						ttl = parsed
-					}
-				}
-				selector = coreauth.NewSessionAffinitySelectorWithConfig(coreauth.SessionAffinityConfig{
-					Fallback: selector,
-					TTL:      ttl,
-				})
-			}
-
-			s.coreManager.SetSelector(selector)
-		}
-
-		s.applyRetryConfig(newCfg)
-		s.applyPprofConfig(newCfg)
-		if s.server != nil {
-			s.server.UpdateClients(newCfg)
-		}
-		s.cfgMu.Lock()
-		s.cfg = newCfg
-		s.cfgMu.Unlock()
-		if s.coreManager != nil {
-			s.coreManager.SetConfig(newCfg)
-			s.coreManager.SetOAuthModelAlias(newCfg.OAuthModelAlias)
-		}
-		s.rebindExecutors()
-	}
-
-	watcherWrapper, err = s.watcherFactory(s.configPath, s.cfg.AuthDir, reloadCallback)
+	watcherWrapper, err = s.watcherFactory(s.configPath, s.cfg.AuthDir, s.applyReloadedConfig)
 	if err != nil {
 		return fmt.Errorf("cliproxy: failed to create watcher: %w", err)
 	}
@@ -720,6 +640,117 @@ func (s *Service) Run(ctx context.Context) error {
 	case err = <-s.serverErr:
 		return err
 	}
+}
+
+// applyReloadedConfig is the canonical "apply a parsed *Config to the
+// running service" hook. The watcher invokes this with a config it just
+// parsed off disk; ApplyConfigBytes invokes this after parsing TOML
+// bytes from a config_hub push. Keeping a single entry point keeps the
+// router selector / retry / pprof / server / coreManager updates in
+// lockstep with whatever the file watcher would have done.
+func (s *Service) applyReloadedConfig(newCfg *config.Config) {
+	previousStrategy := ""
+	var previousSessionAffinity bool
+	var previousSessionAffinityTTL string
+	s.cfgMu.RLock()
+	if s.cfg != nil {
+		previousStrategy = strings.ToLower(strings.TrimSpace(s.cfg.Routing.Strategy))
+		previousSessionAffinity = s.cfg.Routing.ClaudeCodeSessionAffinity || s.cfg.Routing.SessionAffinity
+		previousSessionAffinityTTL = s.cfg.Routing.SessionAffinityTTL
+	}
+	s.cfgMu.RUnlock()
+
+	if newCfg == nil {
+		s.cfgMu.RLock()
+		newCfg = s.cfg
+		s.cfgMu.RUnlock()
+	}
+	if newCfg == nil {
+		return
+	}
+
+	nextStrategy := strings.ToLower(strings.TrimSpace(newCfg.Routing.Strategy))
+	normalizeStrategy := func(strategy string) string {
+		switch strategy {
+		case "fill-first", "fillfirst", "ff":
+			return "fill-first"
+		default:
+			return "round-robin"
+		}
+	}
+	previousStrategy = normalizeStrategy(previousStrategy)
+	nextStrategy = normalizeStrategy(nextStrategy)
+
+	nextSessionAffinity := newCfg.Routing.ClaudeCodeSessionAffinity || newCfg.Routing.SessionAffinity
+	nextSessionAffinityTTL := newCfg.Routing.SessionAffinityTTL
+
+	selectorChanged := previousStrategy != nextStrategy ||
+		previousSessionAffinity != nextSessionAffinity ||
+		previousSessionAffinityTTL != nextSessionAffinityTTL
+
+	if s.coreManager != nil && selectorChanged {
+		var selector coreauth.Selector
+		switch nextStrategy {
+		case "fill-first":
+			selector = &coreauth.FillFirstSelector{}
+		default:
+			selector = &coreauth.RoundRobinSelector{}
+		}
+
+		if nextSessionAffinity {
+			ttl := time.Hour
+			if ttlStr := strings.TrimSpace(nextSessionAffinityTTL); ttlStr != "" {
+				if parsed, err := time.ParseDuration(ttlStr); err == nil && parsed > 0 {
+					ttl = parsed
+				}
+			}
+			selector = coreauth.NewSessionAffinitySelectorWithConfig(coreauth.SessionAffinityConfig{
+				Fallback: selector,
+				TTL:      ttl,
+			})
+		}
+
+		s.coreManager.SetSelector(selector)
+	}
+
+	s.applyRetryConfig(newCfg)
+	s.applyPprofConfig(newCfg)
+	if s.server != nil {
+		s.server.UpdateClients(newCfg)
+	}
+	s.cfgMu.Lock()
+	s.cfg = newCfg
+	s.cfgMu.Unlock()
+	if s.coreManager != nil {
+		s.coreManager.SetConfig(newCfg)
+		s.coreManager.SetOAuthModelAlias(newCfg.OAuthModelAlias)
+	}
+	s.rebindExecutors()
+}
+
+// ApplyConfigBytes parses a raw TOML config payload and applies it to
+// the running service in-place, equivalent to a watcher-driven reload
+// minus the file-system round trip. This is the in-memory entry point
+// used by config_hub push-based hot reload, and it is safe to call
+// before Run() has fully wired the embedded server (the inner state
+// machine guards on s.server == nil internally).
+//
+// Returns a parse / hash / sanitize error if the payload is malformed;
+// successful application has no return value because the underlying
+// reload chain is fire-and-forget.
+func (s *Service) ApplyConfigBytes(data []byte) error {
+	if s == nil {
+		return nil
+	}
+	newCfg, err := config.LoadConfigBytes(data)
+	if err != nil {
+		return err
+	}
+	if newCfg == nil {
+		return nil
+	}
+	s.applyReloadedConfig(newCfg)
+	return nil
 }
 
 // Shutdown gracefully stops background workers and the HTTP server.

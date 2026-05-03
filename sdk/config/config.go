@@ -41,6 +41,12 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	return internalconfig.LoadConfigOptional(configFile, optional)
 }
 
+// LoadConfigBytes parses raw TOML config bytes without filesystem IO.
+// Used by in-memory hot-reload pipelines.
+func LoadConfigBytes(data []byte) (*Config, error) {
+	return internalconfig.LoadConfigBytes(data)
+}
+
 func SaveConfig(configFile string, cfg *Config) error {
 	return internalconfig.SaveConfig(configFile, cfg)
 }

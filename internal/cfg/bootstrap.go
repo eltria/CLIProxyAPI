@@ -2,11 +2,9 @@ package cfg
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -78,36 +76,29 @@ func Bootstrap(ctx context.Context, opt Options) {
 	src.Watch(ctx, opt.DataID)
 }
 
-// writeAtomic writes b to path via tmp + rename so concurrent readers
-// (cliproxy's fsnotify-watched LoadConfigOptional path) never see a
-// half-written file. The directory is created if needed.
+// writeAtomic writes b to path via a direct overwrite. The directory is
+// created if needed.
 //
-// When the destination is a bind-mounted single file (e.g. Zeabur
-// Config Editor overlays /CLIProxyAPI/config.toml as a read-only
-// mountpoint, but the file content itself is writable in-place), the
-// kernel returns EBUSY on rename(2) because you can't replace a
-// mountpoint inode. Fall back to a direct overwrite in that case —
-// it loses cross-syscall atomicity, but for the small TOML bodies
-// cliproxy reads it's a single write() syscall so readers either see
-// the old or new content, never a torn file.
+// We deliberately avoid a tmp+rename strategy: cliproxy's fsnotify watch
+// on the spool resolves to an inode at Add time, and rename(2) replaces
+// that inode in-place. The watch on the old inode then becomes stale
+// (the kernel reports IN_MOVE_SELF and stops delivering events), so
+// every subsequent config_hub push is silently dropped — the spool gets
+// the new content but reloadConfigIfChanged is never invoked. A direct
+// overwrite reuses the original inode and produces an IN_MODIFY event
+// that the watcher actually sees.
+//
+// For the ~15 KB TOML bodies cliproxy uses, a single write(2) syscall
+// is large enough that a racing reader could in principle observe a
+// short read; in practice config.LoadConfig logs the parse error and
+// retries on the next reload, and the watcher's 150ms debounce makes
+// the window vanishingly small.
 func writeAtomic(path string, b []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", filepath.Dir(path), err)
 	}
-	tmp := path + ".cfghub.tmp"
-	if err := os.WriteFile(tmp, b, 0o644); err != nil {
-		return fmt.Errorf("write tmp %s: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		if errors.Is(err, syscall.EBUSY) {
-			// Direct overwrite when the destination is a mounted file.
-			if writeErr := os.WriteFile(path, b, 0o644); writeErr != nil {
-				return fmt.Errorf("rename hit EBUSY and direct write %s failed: %w", path, writeErr)
-			}
-			return nil
-		}
-		return fmt.Errorf("rename %s -> %s: %w", tmp, path, err)
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil
 }
